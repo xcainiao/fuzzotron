@@ -119,58 +119,6 @@ int send_tcp(char * host, int port, char * packet, unsigned long packet_len){
 	}
 
     if(fuzz.is_tls){
-        // Set up the things for TLS
-        int ret;
-        SSL *ssl;
-        SSL_CTX * ctx;
-        size_t alpn_len;
-        unsigned char * alpn;
-
-        SSL_library_init();
-        OpenSSL_add_all_algorithms();
-        SSL_load_error_strings();
-
-        ctx = SSL_CTX_new(SSLv23_client_method());
-        if(ctx == NULL){
-            printf("[!] Error spawning TLS context\n");
-            ERR_print_errors_fp(stdout);
-            return -1;
-        }
-
-        if(fuzz.alpn){
-            alpn = next_protos_parse(&alpn_len, fuzz.alpn);
-            if(!alpn){
-                fatal("[!] Error in alpn next_protos_parse");
-            }
-
-            if(SSL_CTX_set_alpn_protos(ctx, alpn, alpn_len) != 0){
-                free(alpn);
-                fatal("[!] Error setting ALPN protos: %s\n", ERR_error_string(ERR_get_error(), NULL));
-            }
-
-            free(alpn);
-        }
-
-        ssl = SSL_new(ctx);
-        SSL_set_fd(ssl,sock);
-        ret = SSL_connect(ssl);
-        if (ret < 1){
-            printf("[!] Error initiating TLS session. Error no: %d\n", SSL_get_error(ssl, ret));
-            SSL_free(ssl);
-            close(sock);
-            SSL_CTX_free(ctx);
-            return -1;
-        }
-
-        callback_ssl_pre_send(ssl, packet, packet_len); // user defined callback
-        if(SSL_write(ssl, packet, packet_len)<0){
-            printf("[!] Error: SSL_write() error no: %d\n", SSL_get_error(ssl, ret));
-        }
-        callback_ssl_post_send(ssl); // user defined callback
-
-        SSL_free(ssl);
-        close(sock);
-        SSL_CTX_free(ctx);
         return 0;
     }
     else{
@@ -181,7 +129,9 @@ int send_tcp(char * host, int port, char * packet, unsigned long packet_len){
         }
         callback_post_send(sock); // user defined callback
     }
-
+    
+    printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
+    printf("%d\n", fuzz.destroy);
 
     if(fuzz.destroy){
         destroy_socket(sock);
