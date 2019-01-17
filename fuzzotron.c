@@ -251,7 +251,6 @@ int main(int argc, char** argv) {
     }
 
     signal(SIGPIPE, SIG_IGN);
-    printf("*****************************%d\n", threads);
     pthread_t workers[threads];
     int i;
     struct worker_args targs[threads];
@@ -320,78 +319,33 @@ void * worker(void * worker_args){
     uint32_t exec_hash;
     int r;
 
-    if(fuzz.shm_id > 0){
-        printf("[.] Trace enabled\n");
-        memset(fuzz.virgin_bits, 255, MAP_SIZE);
-        fuzz.trace_bits = setup_shm(fuzz.shm_id);
-    }
-
-    if(fuzz.shm_id > 0 && fuzz.gen == RADAMSA){
-        cases = load_testcases(fuzz.in_dir, ""); // load all cases from the provided dir
-        entry = cases;
-
-        if(fuzz.trace_bits == 0){
-            return NULL;
-        }
-
-        // A server crash in calibration is not handled gracefully, this needs to be tidied up
-        while(entry){
-            memset(fuzz.trace_bits, 0x00, MAP_SIZE);
-            if(fuzz.send(fuzz.host, fuzz.port, entry->data, entry->len) < 0){
-                fatal("[!] Failure in calibration\n");
-            }
-
-            exec_hash = wait_for_bitmap(fuzz.trace_bits);
-            if(exec_hash > 0){
-                if(has_new_bits(fuzz.virgin_bits, fuzz.trace_bits) > 1){
-                    r = calibrate_case(entry->data, entry->len, fuzz.trace_bits);
-                    if(r == 0)
-                        cases_jettisoned++;
-                    else{
-                        paths++;
-                    }
-                }
-            }
-            entry = entry->next;
-            cases_sent++;
-        }
-        printf("\n[.] Loaded Paths: %lu Jettisoned: %lu\n", paths, cases_jettisoned);
-        free_testcases(cases);
-    }
-
-    while(1){
+    if(1){
         // generate the test cases
-        if(fuzz.gen == BLAB){
-            cases = generator_blab(CASE_COUNT, fuzz.grammar, fuzz.tmp_dir, prefix);
-        }
-
-        else if(fuzz.gen == RADAMSA){
+        if(fuzz.gen == RADAMSA){
             // Perform some deterministic mutations before going off to radamsa.
             // currently limited to the first thread.
             if(deterministic == 1 && thread_info->thread_id == 1){
                 //printf("Performing deterministic mutations\n");
-                printf("**********************************************************************************\n");
 
-                struct testcase * orig_cases = load_testcases(fuzz.in_dir, ""); // load all cases from the provided dir
+                struct testcase * orig_cases = load_testcases(fuzz.in_dir, "");
                 struct testcase * orig_entry = orig_cases;
-                
                 while(orig_entry){
-                    /*
                     if(determ_fuzz(orig_entry->data, orig_entry->len, thread_info->thread_id) < 0){
                         free_testcases(orig_cases);
+                        printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
                         goto cleanup;
                     }
+                    orig_entry = orig_entry->next;
 
                     if(stop < 0){
                         break;
                     }
-                    */
-                    printf("%d\n", orig_entry->len);
-                    orig_entry = orig_entry->next;
+                printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
                 }
                 free_testcases(orig_cases);
 
-                /*
+                printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
+                printf("%d\n", deterministic);
                 if(deterministic > 0){
                     deterministic = 0;
                     if(fuzz.shm_id)
@@ -400,14 +354,9 @@ void * worker(void * worker_args){
                         printf("[.] Deterministic mutations completed, sent: %lu\n", cases_sent);
                 }
 
-                if(stop < 0) // an error or crash occured during the deteministic steps
-                    break;
-
-                continue;
-                */
             }
 
-            //cases = generator_radamsa(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
+        // cases = generator_radamsa(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
 		}
 
         if(send_cases(cases) < 0){
@@ -471,16 +420,38 @@ int send_cases(void * cases){
             continue;
         }
         if(fuzz.shm_id){
+            memset(fuzz.trace_bits, 0x00, MAP_SIZE);
+            ret = fuzz.send(fuzz.host, fuzz.port, entry->data, entry->len);
+            //stop = send_tcp(fuzz.host, fuzz.port, entry->data, entry->len);
+            if(ret < 0)
+                break;
+
+            exec_hash = wait_for_bitmap(fuzz.trace_bits);
+            if(exec_hash > 0){
+                if(has_new_bits(fuzz.virgin_bits, fuzz.trace_bits) > 1){
+                    r = calibrate_case(entry->data, entry->len, fuzz.trace_bits);
+                    if(r == -1){
+                        // crash during calibration?
+                        ret = r;
+                        break;
+                    }
+                    else if(r == 0){
+                        cases_jettisoned++;
+                    }
+                    else{
+                        paths++; // new case! save and perform some deterministic fuzzing
+                        save_case(entry->data, entry->len, exec_hash, fuzz.in_dir);
+
+                        if(fuzz.gen != BLAB){
+                            determ_fuzz(entry->data, entry->len, 1); // attention defecit fuzzing
+                        }
+                    }
+                }
+            }
         }
         else {
             // no instrumentation
             ret = fuzz.send(fuzz.host, fuzz.port, entry->data, entry->len);
-            printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
-
-            if(check_stop(entry, ret)<0){
-                free_testcases(cases);
-                return -1;
-            }
 
             if(ret < 0)
                 break;
@@ -490,6 +461,10 @@ int send_cases(void * cases){
         cases_sent++;
     }
 
+    if(check_stop(cases, ret)<0){
+        free_testcases(cases);
+        return -1;
+    }
 
     free_testcases(cases);
     return 0;

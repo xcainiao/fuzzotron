@@ -137,6 +137,7 @@ struct testcase * load_testcases(char * path, char * prefix){
         char file_path[PATH_MAX];
 
         snprintf(file_path, PATH_MAX, "%s/%s", path, ents->d_name);
+        printf("loading file----- %s\n", file_path);
         if((fp = fopen(file_path, "r"))== NULL){
             fatal("[!] Error: Could not open file %s: %s\n", file_path, strerror(errno));
         }
