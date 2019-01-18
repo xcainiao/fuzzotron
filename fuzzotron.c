@@ -308,102 +308,37 @@ void * worker(void * worker_args){
 
     int deterministic = 1;
 
-    // Use the PID as the prefix for generation
     char prefix[25];
     sprintf(prefix,"%d",(int)syscall(SYS_gettid));
 
-    // Testcases
     struct testcase * cases = 0x00;
     struct testcase * entry = 0x00;
 
     uint32_t exec_hash;
     int r;
 
-    if(1){
-        // generate the test cases
-        if(fuzz.gen == RADAMSA){
-            // Perform some deterministic mutations before going off to radamsa.
-            // currently limited to the first thread.
-            if(deterministic == 1 && thread_info->thread_id == 1){
-                //printf("Performing deterministic mutations\n");
+    if(fuzz.gen == RADAMSA){
+        if(deterministic == 1 && thread_info->thread_id == 1){
+            
+            printf("hello world\n");
+            struct testcase * orig_cases = load_testcases(fuzz.in_dir, "");
+            struct testcase * orig_entry = orig_cases;
 
-                struct testcase * orig_cases = load_testcases(fuzz.in_dir, "");
-                struct testcase * orig_entry = orig_cases;
-                while(orig_entry){
-                    if(determ_fuzz(orig_entry->data, orig_entry->len, thread_info->thread_id) < 0){
-                        free_testcases(orig_cases);
-                        printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
-                        goto cleanup;
-                    }
-                    orig_entry = orig_entry->next;
-
-                    if(stop < 0){
-                        break;
-                    }
-                printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
-                }
+            if(send_cases(orig_entry) < 0){
                 free_testcases(orig_cases);
-
-                printf("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n");
-                printf("%d\n", deterministic);
-                if(deterministic > 0){
-                    deterministic = 0;
-                    if(fuzz.shm_id)
-                        printf("[.] Deterministic mutations completed, sent: %lu paths: %lu\n", cases_sent, paths);
-                    else
-                        printf("[.] Deterministic mutations completed, sent: %lu\n", cases_sent);
-                }
-
+                goto cleanup;
             }
 
-        // cases = generator_radamsa(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
-		}
-
-        if(send_cases(cases) < 0){
-            goto cleanup;
+            deterministic = 0;
         }
-    } 
+	}
 
 cleanup:
+    stop = 1;
     printf("[!] Thread %d exiting\n", thread_info->thread_id);
     return NULL;
 }
 
-// Perform determisistic mutations, id and max paramters for splitting work load across threads
-int determ_fuzz(char * data, unsigned long len, unsigned int id){
-    unsigned long max = len << 3;
-    unsigned long offset = 0;
-
-    struct testcase * cases;
-
-    if(max < 100){
-        cases = generate_swbitflip(data, len, offset, max);
-        if(send_cases(cases)<0){
-            return -1;
-        }
-    }
-    else{
-        unsigned long i = 0;
-
-        while(i < (max/100)){
-            cases = generate_swbitflip(data, len, offset, 100);
-            if(send_cases(cases) < 0){
-                return -1;
-            }
-            offset = offset+100;
-            i++;
-        }
-        if(max % 100 > 0){
-            //printf("%d generating remainder len %lu start %lu count %lu\n", id, len, offset, max % 100);
-            cases = generate_swbitflip(data, len, offset, max % 100);
-            if(send_cases(cases) < 0){
-                return -1;
-            }
-        }
-    }
-
-    return 0;
-}
 
 // Send all cases in a struct. return -1 if any failure, otherwise 0. Frees the supplied cases struct
 // and updates global counters.
@@ -412,58 +347,26 @@ int send_cases(void * cases){
     struct testcase * entry = cases;
     uint32_t exec_hash;
     
+    printf("11111111111111111111111111111111111\n");
+
     while(entry){
         if(entry->len == 0){
-            // no data in test case, go to next one. Radamsa will generate null
-            // testcases sometimes...
             entry = entry->next;
             continue;
         }
-        if(fuzz.shm_id){
-            memset(fuzz.trace_bits, 0x00, MAP_SIZE);
-            ret = fuzz.send(fuzz.host, fuzz.port, entry->data, entry->len);
-            //stop = send_tcp(fuzz.host, fuzz.port, entry->data, entry->len);
-            if(ret < 0)
-                break;
-
-            exec_hash = wait_for_bitmap(fuzz.trace_bits);
-            if(exec_hash > 0){
-                if(has_new_bits(fuzz.virgin_bits, fuzz.trace_bits) > 1){
-                    r = calibrate_case(entry->data, entry->len, fuzz.trace_bits);
-                    if(r == -1){
-                        // crash during calibration?
-                        ret = r;
-                        break;
-                    }
-                    else if(r == 0){
-                        cases_jettisoned++;
-                    }
-                    else{
-                        paths++; // new case! save and perform some deterministic fuzzing
-                        save_case(entry->data, entry->len, exec_hash, fuzz.in_dir);
-
-                        if(fuzz.gen != BLAB){
-                            determ_fuzz(entry->data, entry->len, 1); // attention defecit fuzzing
-                        }
-                    }
-                }
-            }
-        }
         else {
-            // no instrumentation
             ret = fuzz.send(fuzz.host, fuzz.port, entry->data, entry->len);
-
             if(ret < 0)
                 break;
+        }
+
+        if(check_stop(cases, ret)<0){
+            free_testcases(cases);
+            return -1;
         }
 
         entry = entry->next;
         cases_sent++;
-    }
-
-    if(check_stop(cases, ret)<0){
-        free_testcases(cases);
-        return -1;
     }
 
     free_testcases(cases);
@@ -473,18 +376,13 @@ int send_cases(void * cases){
 // checks the return code from send_cases et-al and sets the global stop variable if
 // its time to stop fuzzing and saves the cases.
 int check_stop(void * cases, int result){
+
+
     int ret = result;
 
-    // if global stop, save cases
-    pthread_mutex_lock(&runlock);
-    if(stop == 1){
-        // save cases
-        save_testcases(cases, output_dir);
-        pthread_mutex_unlock(&runlock);
-        return -1;
-    }
-    pthread_mutex_unlock(&runlock);
-
+    printf("%d\n", check_pid);
+    printf("0000000000000000000000000000000000000000000000000000000000000000000000\n");
+    sleep(2);
     // If process id is supplied, check it exists and set stop if it doesn't
     if(check_pid > 0){
         if((pid_exists(check_pid)) == -1){
@@ -506,6 +404,7 @@ int check_stop(void * cases, int result){
             ret = 0;
         }
     }
+    
 
     if(ret == -1){
         // We have experienced a crash. set the global stop var
