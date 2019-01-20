@@ -105,7 +105,6 @@ int send_tcp(char * host, int port, char * packet, unsigned long packet_len){
 	serv_addr.sin_port = htons(port);
     inet_pton(AF_INET, host, &serv_addr.sin_addr);
     
-    printf("send 108 ************************************\n");
 
     int c = connect(sock, (struct sockaddr *)&serv_addr, sizeof(serv_addr));
 	if(c < 0){

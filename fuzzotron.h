@@ -14,6 +14,7 @@
 #define BLAB 0x02
 
 extern int stop; // set to 1 to stop fuzzing
+extern int regx; // set to 1 to stop fuzzing
 
 struct fuzzer_args {
     int gen; // generator for the test cases. Blab, radamsa, custom etcetera.

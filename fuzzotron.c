@@ -35,6 +35,7 @@
 struct monitor_args mon_args;
 
 int stop = 0;   // the global 'stop fuzzing' variable. When set to 1, all threads will spool
+int regx = 0;   // the global 'stop fuzzing' variable. When set to 1, all threads will spool
                 // their cases to disk and exit.
 pthread_mutex_t runlock;
 int check_pid = 0; // server pid to check for crash.
@@ -292,7 +293,8 @@ int main(int argc, char** argv) {
 
     pthread_mutex_destroy(&runlock);
     printf("[.] Done. Total testcases issued: %lu\n", cases_sent);
-
+    if(check_pid)
+        kill(check_pid, SIGKILL);
 	return 1;   
 }
 
@@ -320,16 +322,20 @@ void * worker(void * worker_args){
     if(fuzz.gen == RADAMSA){
         if(deterministic == 1 && thread_info->thread_id == 1){
             
-            printf("hello world\n");
             struct testcase * orig_cases = load_testcases(fuzz.in_dir, "");
             struct testcase * orig_entry = orig_cases;
 
             if(send_cases(orig_entry) < 0){
-                free_testcases(orig_cases);
                 goto cleanup;
             }
 
             deterministic = 0;
+        }
+
+        cases = generator_other(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
+        //cases = generator_radamsa(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
+        if(send_cases(cases) < 0){
+            goto cleanup;
         }
 	}
 
@@ -347,7 +353,6 @@ int send_cases(void * cases){
     struct testcase * entry = cases;
     uint32_t exec_hash;
     
-    printf("11111111111111111111111111111111111\n");
 
     while(entry){
         if(entry->len == 0){
@@ -356,11 +361,8 @@ int send_cases(void * cases){
         }
         else {
             ret = fuzz.send(fuzz.host, fuzz.port, entry->data, entry->len);
-            if(ret < 0)
-                break;
         }
-
-        if(check_stop(cases, ret)<0){
+        if(check_stop(entry, ret)<0){
             free_testcases(cases);
             return -1;
         }
@@ -376,79 +378,28 @@ int send_cases(void * cases){
 // checks the return code from send_cases et-al and sets the global stop variable if
 // its time to stop fuzzing and saves the cases.
 int check_stop(void * cases, int result){
+    int ret = 0;
 
+    usleep(50000);
 
-    int ret = result;
-
-    printf("%d\n", check_pid);
-    printf("0000000000000000000000000000000000000000000000000000000000000000000000\n");
-    sleep(2);
-    // If process id is supplied, check it exists and set stop if it doesn't
-    if(check_pid > 0){
-        if((pid_exists(check_pid)) == -1){
-            ret = -1;
-        }
-        else{
-            ret = 0;
-        }
-    }
-
-    if(fuzz.check_script){
-        int r;
-        r = run_check(fuzz.check_script);
-        if( r != 1){
-            printf("[!] Check script %s returned %d, stopping\n", fuzz.check_script, r);
-            ret = -1;
-        }
-        else{
-            ret = 0;
-        }
-    }
-    
-
-    if(ret == -1){
+    printf("now server pid: %d\n", check_pid);
+    if(regx == 1){
         // We have experienced a crash. set the global stop var
         pthread_mutex_lock(&runlock);
         stop = 1;
         save_testcases(cases, output_dir);
         pthread_mutex_unlock(&runlock);
-    }
-
-    return ret;
-}
-
-/* Calibrate a new testcase. Returns 1 if the testcase behaves deterministically, 0 if it does not
- * EG: has variable behaviour. Without this, non deterministic features would cause a bunch of
- * tiny, useless test cases. Return -1 on failure. Timeout on waiting for the bitmap to stop changing
- * is an immediate 0.
- */
-int calibrate_case(char * testcase, unsigned long len, uint8_t * trace_bits){
-    uint32_t hash, tmp_hash, i;
-
-    memset(trace_bits, 0x00, MAP_SIZE);
-    if(fuzz.send(fuzz.host, fuzz.port, testcase, len) < 0){
         return -1;
     }
 
-    hash = wait_for_bitmap(trace_bits); // check null
-    if(hash == 0 || hash == NULL_HASH) // unstable test case, bitmap still changing after 2 seconds, or no bitmap change
-        return 0;
-    
-    for(i = 0; i < 4; i++){
-        memset(trace_bits, 0x00, MAP_SIZE);
-        if(fuzz.send(fuzz.host, fuzz.port, testcase, len) < 0){
+    // If process id is supplied, check it exists and set stop if it doesn't
+    if(check_pid > 0){
+        check_pid = runpro();
+        if(check_pid<=0)
             return -1;
-        }
-        tmp_hash = wait_for_bitmap(trace_bits);
-        if(tmp_hash != hash){
-            // printf("[!] Non deterministic testcase detected\n");
-            return 0;
-        }
     }
 
-    // timing and case trimming should eventually go here
-
-    return 1;
+    return 0;
 }
 
 int pid_exists(int pid){

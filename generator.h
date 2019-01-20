@@ -21,8 +21,12 @@ struct testcase {
 
 struct testcase * generator_blab(char * count, char * grammar, char * path, char * prefix);
 struct testcase * generator_radamsa(char * count, char * testcase_dir, char * path, char * prefix);
+struct testcase * generator_other(char * count, char * testcase_dir, char * path, char * prefix);
 struct testcase * generate_swbitflip(char * input, unsigned long in_len, unsigned long offset, unsigned long count);
 struct testcase * load_testcases(char * path, char * prefix);
+void writerandom(char *filename);
+void writeflag(char *filename, int flag);
+
 int save_testcases(struct testcase * cases, char * path);
 void save_case(char * data, unsigned long len, uint32_t hash, char * directory);
 int save_case_p(char * data, unsigned long len, char * prefix, char * directory);

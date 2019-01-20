@@ -1,3 +1,5 @@
+test:test.c
+	gcc -g -fsanitize=address -o test test.c
 bug:bug.c
 	gcc -g -fsanitize=address -o bug bug.c
 clinet:client.c

@@ -23,13 +23,72 @@
 // Executes radamsa and returns a linked list of test cases
 // this is pretty inefficient, and running a radamsa server and reading from the socket
 // would likely be a far, far smarter idea.
+struct testcase * generator_other(char * count, char * testcase_dir, char * path, char * prefix){
+    pid_t pid;
+    int s;
+    char output[PATH_MAX];
+    struct testcase * testcase;
+    FILE *write_ptr;
+    int nums = strtol(count, NULL, 10);
+
+    printf("----------------------------------------------------\n");
+    printf("*****************************************************\n");
+    while(nums){
+        snprintf(output, PATH_MAX, "%s/%s-%d", path, prefix, nums);
+        nums--;
+        writeflag(output, 0);
+        writerandom(output);
+    }
+    testcase = load_testcases(path, prefix);
+    return testcase;
+
+}
+
+void writerandom(char *filename){
+    char *res;
+    int i=0;
+    FILE *write_ptr;
+    int randomchar;
+
+    srand(time(NULL));
+    int randomnumber;
+    
+    randomnumber = rand() % 200000;
+
+    res = (char *)malloc(randomnumber);
+    memset(res, '\0', randomnumber);
+    
+    while(i<randomnumber-1){
+        randomchar = rand() % 255;
+        res[i] = randomchar;
+        i++;
+    }
+
+    write_ptr = fopen(filename, "ab");
+    fwrite(res, randomnumber, 1, write_ptr);
+    fclose(write_ptr);
+}
+
+void writeflag(char *filename, int flag){
+    FILE *write_ptr;
+    char buffer[10];
+    write_ptr = fopen(filename, "wb");
+    if(flag){
+        fwrite(buffer, sizeof(buffer), 1, write_ptr);
+    }
+    fclose(write_ptr);
+    
+}
 struct testcase * generator_radamsa(char * count, char * testcase_dir, char * path, char * prefix){
     pid_t pid;
     int s;
     char output[PATH_MAX];
     struct testcase * testcase;
+    
+    printf("----------------------------------------------------\n");
 
     snprintf(output, PATH_MAX, "%s/%s-%%n", path, prefix);
+
     char * argv[] = { "radamsa", "-n", count, "-r", "-o", output, testcase_dir, 0 };
 
     if((pid = fork()) == 0){
@@ -137,7 +196,6 @@ struct testcase * load_testcases(char * path, char * prefix){
         char file_path[PATH_MAX];
 
         snprintf(file_path, PATH_MAX, "%s/%s", path, ents->d_name);
-        printf("loading file----- %s\n", file_path);
         if((fp = fopen(file_path, "r"))== NULL){
             fatal("[!] Error: Could not open file %s: %s\n", file_path, strerror(errno));
         }
@@ -200,7 +258,8 @@ int save_testcases(struct testcase * cases, char * path){
     char prefix[25];
     sprintf(prefix,"%d",(int)syscall(SYS_gettid));
 
-    while(entry){
+    //while(entry)
+    {
         snprintf(filename, PATH_MAX, "%s-%d", prefix, i);
         save_case_p(entry->data, entry->len, filename, path);
         entry = entry->next;
