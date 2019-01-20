@@ -293,8 +293,8 @@ int main(int argc, char** argv) {
 
     pthread_mutex_destroy(&runlock);
     printf("[.] Done. Total testcases issued: %lu\n", cases_sent);
-    if(check_pid)
-        kill(check_pid, SIGKILL);
+    //if(check_pid)
+    //    kill(check_pid, SIGKILL);
 	return 1;   
 }
 
@@ -332,7 +332,7 @@ void * worker(void * worker_args){
             deterministic = 0;
         }
 
-        cases = generator_other(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
+        cases = generator_other("100", fuzz.in_dir, fuzz.tmp_dir, prefix);
         //cases = generator_radamsa(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
         if(send_cases(cases) < 0){
             goto cleanup;
@@ -391,12 +391,13 @@ int check_stop(void * cases, int result){
         pthread_mutex_unlock(&runlock);
         return -1;
     }
+    usleep(500000);
 
     // If process id is supplied, check it exists and set stop if it doesn't
-    if(check_pid > 0){
-        check_pid = runpro();
-        if(check_pid<=0)
-            return -1;
+    check_pid = runpro();
+    if(check_pid<=0){
+        printf("server is not running *****************************\n");
+        return -1;
     }
 
     return 0;

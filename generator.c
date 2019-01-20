@@ -36,7 +36,7 @@ struct testcase * generator_other(char * count, char * testcase_dir, char * path
     while(nums){
         snprintf(output, PATH_MAX, "%s/%s-%d", path, prefix, nums);
         nums--;
-        writeflag(output, 0);
+        writeflag(output, 1);
         writerandom(output);
     }
     testcase = load_testcases(path, prefix);
@@ -71,10 +71,29 @@ void writerandom(char *filename){
 
 void writeflag(char *filename, int flag){
     FILE *write_ptr;
-    char buffer[10];
+    char pl[13];
     write_ptr = fopen(filename, "wb");
+
+    pl[0] = 0xFF;pl[1] = 0x00;pl[2] = 0x00;pl[3] = 0x00;
+    pl[4] = 0x00;pl[5] = 0x00;pl[6] = 0x00;pl[7] = 0x00;pl[8] = 0x00;
+
+    pl[9] = 0x01;pl[10] = 0x01;pl[11] = 0x00;
+
+    pl[12] = 0x05;
+    /*
+    pl[13] = 0xFF;
+    pl[13] = 0xFF;
+    pl[14] = 0xFF;
+    pl[15] = 0xFF;
+    pl[16] = 0xFF;
+    pl[17] = 0xFF;
+    pl[18] = 0xFF;
+    pl[19] = 0xFF;
+    pl[20] = 0xFF;
+    */
+
     if(flag){
-        fwrite(buffer, sizeof(buffer), 1, write_ptr);
+        fwrite(pl, sizeof(pl), 1, write_ptr);
     }
     fclose(write_ptr);
     

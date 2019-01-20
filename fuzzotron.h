@@ -7,7 +7,7 @@
 #include "trace.h"
 
 // Tunables
-#define CASE_COUNT "100"
+#define CASE_COUNT "1000"
 #define CASE_DIR "/dev/shm/fuzzotron"
 
 #define RADAMSA 0x01

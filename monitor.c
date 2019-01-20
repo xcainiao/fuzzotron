@@ -107,7 +107,7 @@ int runpro()
 
     //char *argv[] = {"./bug", ">", "log.txt", "2>&1", 0};
     //char *argv[] = {"./bug", 0};
-    char command[] = "./testcase/bug > log.txt 2>&1";
+    char command[] = "{ /home/fan/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1";
     res = get_percent_used();
     if(res!=0){
         kill(res, SIGKILL);
@@ -123,6 +123,7 @@ int runpro()
         return 0;
     }
     else{
+        usleep(50000);
         res = get_percent_used();
         return res;
         //waitpid(pid, &s, 0x00);
