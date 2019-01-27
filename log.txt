@@ -1,0 +1,3 @@
+{ /home/fan/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1
+
+./fuzzotron --radamsa --directory ./input/ -h 127.0.0.1 -p 6666 -P tcp -m /tmp/log.txt -r "AddressSanitizer" -o ./crashes/ -t 1 -c `./getpid.sh`

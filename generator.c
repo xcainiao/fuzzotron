@@ -71,7 +71,7 @@ void writerandom(char *filename){
 
 void writeflag(char *filename, int flag){
     FILE *write_ptr;
-    char pl[13];
+    char pl[21];
     write_ptr = fopen(filename, "wb");
 
     pl[0] = 0xFF;pl[1] = 0x00;pl[2] = 0x00;pl[3] = 0x00;
@@ -79,9 +79,7 @@ void writeflag(char *filename, int flag){
 
     pl[9] = 0x01;pl[10] = 0x01;pl[11] = 0x00;
 
-    pl[12] = 0x05;
-    /*
-    pl[13] = 0xFF;
+    pl[12] = 0x02;
     pl[13] = 0xFF;
     pl[14] = 0xFF;
     pl[15] = 0xFF;
@@ -90,8 +88,6 @@ void writeflag(char *filename, int flag){
     pl[18] = 0xFF;
     pl[19] = 0xFF;
     pl[20] = 0xFF;
-    */
-
     if(flag){
         fwrite(pl, sizeof(pl), 1, write_ptr);
     }
