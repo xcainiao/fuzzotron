@@ -31,6 +31,8 @@
 #include "trace.h"
 #include "util.h"
 
+#define SIZE 1000
+
 // Struct to hold arguments passed to the monitor thread
 struct monitor_args mon_args;
 
@@ -71,7 +73,7 @@ int main(int argc, char** argv) {
         {0, 0, 0, 0}
     };
     int arg_index;
-    while((c = getopt_long(argc, argv, "d:c:h:p:g:t:m:c:P:r:w:s:z:o:C:", arg_options, &arg_index)) != -1){
+    while((c = getopt_long(argc, argv, "d:c:h:p:g:t:m:c:P:r:w:s:z:o:y:", arg_options, &arg_index)) != -1){
         switch(c){
             case 'c':
                 // Define PID to check for crash
@@ -105,6 +107,11 @@ int main(int argc, char** argv) {
             case 'm':
                 // Log file to monitor
                 logfile = optarg;
+                break;
+
+            case 'y':
+                // Log file to monitor
+                server_command = optarg;
                 break;
 
             case 'o':
@@ -159,6 +166,16 @@ int main(int argc, char** argv) {
            }
     }
 
+    // if we're using blab, ensure we have a grammar defined
+    if(check_pid == 0 && server_command == NULL){
+        fatal("your server is not running\n");
+    }
+    if(check_pid == 0 && server_command != NULL){
+        check_pid = runpro(server_command);
+        if(check_pid<=0)
+            fatal("your server is not running\n");
+    }
+
     // check argument sanity
     if((fuzz.host == NULL) || (fuzz.port == 0 && fuzz.protocol != 3) ||
             (use_blab == 1 && use_radamsa == 1 && use_self == 1) ||
@@ -168,15 +185,11 @@ int main(int argc, char** argv) {
             (use_blab == 0 && use_radamsa == 0 && use_self == 0) ||
             (use_blab == 1 && fuzz.in_dir && !fuzz.shm_id) ||
             (use_radamsa == 1 && fuzz.grammar != NULL) ||
-            (fuzz.protocol == 0) || (output_dir == NULL) ){
+            (fuzz.protocol == 0) || (output_dir == NULL) || server_command == NULL){
         help();
         return -1;
     }
 
-    // if we're using blab, ensure we have a grammar defined
-    if(check_pid == 0){
-        fatal("your server is not running\n");
-    }
 
     // if we're using blab, ensure we have a grammar defined
     if(use_blab == 1 && fuzz.grammar == NULL){
@@ -432,7 +445,7 @@ int pid_exists(int pid){
     return 0;
 }
 
-int runpro(char *command1)
+int runpro(char *command)
 {
     int res;
     pid_t pid;
@@ -441,7 +454,7 @@ int runpro(char *command1)
 
     //char *argv[] = {"./bug", ">", "log.txt", "2>&1", 0};
     //char *argv[] = {"./bug", 0};
-    char command[] = "{ /home/fuzz/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1";
+    //char command[] = "{ /home/fuzz/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1";
     res = get_percent_used();
     if(res!=0){
         kill(res, SIGKILL);
@@ -464,6 +477,31 @@ int runpro(char *command1)
     }
     return 0;
 }
+
+int get_percent_used ()
+{
+    char buffer[SIZE];
+    char command[SIZE];
+    FILE* pipe = 0;
+    int pid = 0;
+
+    sprintf (command, "./getpid.sh");
+
+    if (!(pipe = popen(command, "r"))) {
+        perror("open failed");
+        return 1;
+    }
+
+    while (fgets(buffer, SIZE, pipe) != NULL) {
+        if(buffer){
+            pid = (int) strtol(buffer, NULL, 10);
+        }
+    }
+    pclose(pipe);
+
+    return pid;
+}
+
 
 int run_check(char * script){
 

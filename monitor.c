@@ -97,27 +97,3 @@ struct real_pcre * compile_regex(char* regex){
     return re;
 }
 
-
-int get_percent_used ()
-{
-    char buffer[SIZE];
-    char command[SIZE];
-    FILE* pipe = 0;
-    int pid = 0;
-
-    sprintf (command, "./getpid.sh");
-
-    if (!(pipe = popen(command, "r"))) {
-        perror("open failed");
-        return 1;
-    }
-
-    while (fgets(buffer, SIZE, pipe) != NULL) {
-        if(buffer){
-            pid = (int) strtol(buffer, NULL, 10);
-        }
-    }
-    pclose(pipe);
-
-    return pid;
-}
