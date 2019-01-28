@@ -42,7 +42,7 @@ int regx = 0;   // the global 'stop fuzzing' variable. When set to 1, all thread
 pthread_mutex_t runlock;
 int check_pid = 0; // server pid to check for crash.
 struct fuzzer_args fuzz; // Arguments for the fuzzer threads
-char * output_dir = NULL, * server_command = NULL; // directory for potential crashes
+char * output_dir = NULL, * server_command = NULL, * monitor_command = NULL; // directory for potential crashes
 
 static unsigned long cases_sent = 0;
 static unsigned long cases_jettisoned = 0;
@@ -73,7 +73,7 @@ int main(int argc, char** argv) {
         {0, 0, 0, 0}
     };
     int arg_index;
-    while((c = getopt_long(argc, argv, "d:c:h:p:g:t:m:c:P:r:w:s:z:o:y:", arg_options, &arg_index)) != -1){
+    while((c = getopt_long(argc, argv, "d:c:h:p:g:t:m:c:P:r:w:s:z:o:y:b:", arg_options, &arg_index)) != -1){
         switch(c){
             case 'c':
                 // Define PID to check for crash
@@ -112,6 +112,11 @@ int main(int argc, char** argv) {
             case 'y':
                 // Log file to monitor
                 server_command = optarg;
+                break;
+
+            case 'b':
+                // Log file to monitor
+                monitor_command = optarg;
                 break;
 
             case 'o':
@@ -185,7 +190,7 @@ int main(int argc, char** argv) {
             (use_blab == 0 && use_radamsa == 0 && use_self == 0) ||
             (use_blab == 1 && fuzz.in_dir && !fuzz.shm_id) ||
             (use_radamsa == 1 && fuzz.grammar != NULL) ||
-            (fuzz.protocol == 0) || (output_dir == NULL) || server_command == NULL){
+            (fuzz.protocol == 0) || (output_dir == NULL) || server_command == NULL || monitor_command == NULL){
         help();
         return -1;
     }
@@ -455,7 +460,7 @@ int runpro(char *command)
     //char *argv[] = {"./bug", ">", "log.txt", "2>&1", 0};
     //char *argv[] = {"./bug", 0};
     //char command[] = "{ /home/fuzz/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1";
-    res = get_percent_used();
+    res = get_current_pid(monitor_command);
     if(res!=0){
         kill(res, SIGKILL);
     }
@@ -471,21 +476,19 @@ int runpro(char *command)
     }
     else{
         usleep(50000);
-        res = get_percent_used();
+        res = get_current_pid(monitor_command);
         return res;
         //waitpid(pid, &s, 0x00);
     }
     return 0;
 }
 
-int get_percent_used ()
+int get_current_pid (char *command)
 {
     char buffer[SIZE];
-    char command[SIZE];
     FILE* pipe = 0;
     int pid = 0;
 
-    sprintf (command, "./getpid.sh");
 
     if (!(pipe = popen(command, "r"))) {
         perror("open failed");

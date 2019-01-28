@@ -65,4 +65,4 @@ int determ_fuzz(char * data, unsigned long len, unsigned int id);
 int send_cases(void * cases);
 int check_stop(void * cases, int result);
 int runpro(char *command);
-int get_percent_used ();
+int get_current_pid (char *monitor_command);
