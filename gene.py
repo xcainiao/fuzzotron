@@ -21,8 +21,10 @@ filename = sys.argv[1]
 
 with open(filename, "w") as f:
     
+    """
     data = flag()
     f.write(data)
+    """
 
     length = random.randint(10000,20000)
     data = random_data(length)

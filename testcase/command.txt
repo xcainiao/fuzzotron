@@ -1,1 +1,4 @@
 ./fuzzotron --radamsa --directory ./input/ -h 127.0.0.1 -p 8887 -P tcp -m ./log.txt -r "AddressSanitizer" -o ./crashes/ -t 1 -c `./getpid.sh`
+
+
+./fuzzotron --self --directory ./input/ -h 127.0.0.1 -p 1234 -P udp -m /tmp/log.txt -r "AddressSanitizer" -o ./crashes/   -y ./run.sh -b ./getpid.sh

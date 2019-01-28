@@ -1,1 +1,1 @@
-{ /home/fuzz/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1
+{ /home/fuzz/github/fuzzotron/testcase/udpserver; } > /tmp/log.txt 2>&1

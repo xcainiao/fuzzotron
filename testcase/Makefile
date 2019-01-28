@@ -7,3 +7,6 @@ clinet:client.c
 
 server:server.c
 	gcc -o server server.c
+
+udpserver:udpserver.c
+	gcc -o udpserver udpserver.c -fsanitize=address
