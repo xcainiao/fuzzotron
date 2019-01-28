@@ -31,69 +31,30 @@ struct testcase * generator_other(char * count, char * testcase_dir, char * path
     FILE *write_ptr;
     int nums = strtol(count, NULL, 10);
 
+
     printf("----------------------------------------------------\n");
+    printf("...........python is running .......................\n");
     printf("*****************************************************\n");
     while(nums){
         snprintf(output, PATH_MAX, "%s/%s-%d", path, prefix, nums);
+        char * argv[] = { "python", "./gene.py", output, 0 };
+        if((pid = fork()) == 0){
+            execvp(argv[0], argv);
+            exit(0);
+        }
+        else if(pid < 0){
+            fatal("[!] generator_radamsa fork() failed: %s", strerror(errno));
+        }
+        else
+            waitpid(pid, &s, 0x00);
+
         nums--;
-        writeflag(output, 1);
-        writerandom(output);
     }
     testcase = load_testcases(path, prefix);
     return testcase;
 
 }
 
-void writerandom(char *filename){
-    char *res;
-    int i=0;
-    FILE *write_ptr;
-    int randomchar;
-
-    srand(time(NULL));
-    int randomnumber;
-    
-    randomnumber = rand() % 200000;
-
-    res = (char *)malloc(randomnumber);
-    memset(res, '\0', randomnumber);
-    
-    while(i<randomnumber-1){
-        randomchar = rand() % 255;
-        res[i] = randomchar;
-        i++;
-    }
-
-    write_ptr = fopen(filename, "ab");
-    fwrite(res, randomnumber, 1, write_ptr);
-    fclose(write_ptr);
-}
-
-void writeflag(char *filename, int flag){
-    FILE *write_ptr;
-    char pl[21];
-    write_ptr = fopen(filename, "wb");
-
-    pl[0] = 0xFF;pl[1] = 0x00;pl[2] = 0x00;pl[3] = 0x00;
-    pl[4] = 0x00;pl[5] = 0x00;pl[6] = 0x00;pl[7] = 0x00;pl[8] = 0x00;
-
-    pl[9] = 0x01;pl[10] = 0x01;pl[11] = 0x00;
-
-    pl[12] = 0x02;
-    pl[13] = 0xFF;
-    pl[14] = 0xFF;
-    pl[15] = 0xFF;
-    pl[16] = 0xFF;
-    pl[17] = 0xFF;
-    pl[18] = 0xFF;
-    pl[19] = 0xFF;
-    pl[20] = 0xFF;
-    if(flag){
-        fwrite(pl, sizeof(pl), 1, write_ptr);
-    }
-    fclose(write_ptr);
-    
-}
 struct testcase * generator_radamsa(char * count, char * testcase_dir, char * path, char * prefix){
     pid_t pid;
     int s;
