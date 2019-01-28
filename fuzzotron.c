@@ -157,7 +157,8 @@ int main(int argc, char** argv) {
 
             case 't':
                 // define threads
-                threads = atoi(optarg);
+                //threads = atoi(optarg);
+                threads = 1;
                 break;
 
             case 's':

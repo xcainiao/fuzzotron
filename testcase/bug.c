@@ -51,7 +51,7 @@ int main()
         memset(buffer,0,sizeof(buffer));
         int len = recv(conn, buffer, sizeof(buffer),0);
         printf("%d\n", len);
-        memcpy(tmp, buffer, 9);
+        memcpy(tmp, buffer, len);
         if (len==0 || len==1024) {
             break;
         }
