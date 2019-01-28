@@ -40,7 +40,7 @@ int regx = 0;   // the global 'stop fuzzing' variable. When set to 1, all thread
 pthread_mutex_t runlock;
 int check_pid = 0; // server pid to check for crash.
 struct fuzzer_args fuzz; // Arguments for the fuzzer threads
-char * output_dir = NULL; // directory for potential crashes
+char * output_dir = NULL, * server_command = NULL; // directory for potential crashes
 
 static unsigned long cases_sent = 0;
 static unsigned long cases_jettisoned = 0;
@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
     memset(&fuzz, 0x00, sizeof(fuzz));
     // parse arguments
     int c, threads = 1;
-    static int use_blab = 0, use_radamsa = 0;
+    static int use_blab = 0, use_radamsa = 0, use_self = 0;;
     char * logfile = NULL, * regex = NULL;
     fuzz.protocol = 0; fuzz.is_tls = 0; fuzz.destroy = 0;
 
@@ -59,6 +59,7 @@ int main(int argc, char** argv) {
         {"alpn", required_argument, 0, 'l'},
         {"blab", no_argument, &use_blab, 1},
         {"radamsa", no_argument, &use_radamsa, 1},
+        {"self", no_argument, &use_self, 1},
         {"ssl", no_argument, &fuzz.is_tls, 1},
         {"grammar",  required_argument, 0, 'g'},
         {"output",  required_argument, 0, 'o'},
@@ -70,7 +71,7 @@ int main(int argc, char** argv) {
         {0, 0, 0, 0}
     };
     int arg_index;
-    while((c = getopt_long(argc, argv, "d:c:h:p:g:t:m:c:P:r:w:s:z:o:", arg_options, &arg_index)) != -1){
+    while((c = getopt_long(argc, argv, "d:c:h:p:g:t:m:c:P:r:w:s:z:o:C:", arg_options, &arg_index)) != -1){
         switch(c){
             case 'c':
                 // Define PID to check for crash
@@ -160,19 +161,28 @@ int main(int argc, char** argv) {
 
     // check argument sanity
     if((fuzz.host == NULL) || (fuzz.port == 0 && fuzz.protocol != 3) ||
-            (use_blab == 1 && use_radamsa == 1) ||
-            (use_blab == 0 && use_radamsa == 0) ||
+            (use_blab == 1 && use_radamsa == 1 && use_self == 1) ||
+            (use_blab == 1 && use_radamsa == 1 && use_self == 0) ||
+            (use_blab == 0 && use_radamsa == 1 && use_self == 1) ||
+            (use_blab == 1 && use_radamsa == 0 && use_self == 1) ||
+            (use_blab == 0 && use_radamsa == 0 && use_self == 0) ||
             (use_blab == 1 && fuzz.in_dir && !fuzz.shm_id) ||
             (use_radamsa == 1 && fuzz.grammar != NULL) ||
-            (fuzz.protocol == 0) || (output_dir == NULL)){
+            (fuzz.protocol == 0) || (output_dir == NULL) ){
         help();
         return -1;
+    }
+
+    // if we're using blab, ensure we have a grammar defined
+    if(check_pid == 0){
+        fatal("your server is not running\n");
     }
 
     // if we're using blab, ensure we have a grammar defined
     if(use_blab == 1 && fuzz.grammar == NULL){
         fatal("If using blab, -g or --grammar must be specified\n");
     }
+
     // if we're using radamsa, ensure the directory with the example cases is defined
     if(use_radamsa == 1 && fuzz.in_dir == NULL){
         fatal("If using radamsa, -d or --directory must be specified\n");
@@ -245,6 +255,9 @@ int main(int argc, char** argv) {
     }
     else if(use_radamsa){
         fuzz.gen = RADAMSA;
+    }
+    else if(use_self){
+        fuzz.gen = SELF;
     }
 
     if (pthread_mutex_init(&runlock, NULL) != 0){
@@ -319,7 +332,7 @@ void * worker(void * worker_args){
     uint32_t exec_hash;
     int r;
 
-    if(fuzz.gen == RADAMSA){
+    if(fuzz.gen == RADAMSA || fuzz.gen == SELF){
         if(deterministic == 1 && thread_info->thread_id == 1){
             
             struct testcase * orig_cases = load_testcases(fuzz.in_dir, "");
@@ -331,9 +344,10 @@ void * worker(void * worker_args){
 
             deterministic = 0;
         }
-
-        cases = generator_other("100", fuzz.in_dir, fuzz.tmp_dir, prefix);
-        //cases = generator_radamsa(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
+        if(fuzz.gen == SELF)
+            cases = generator_other(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
+        if(fuzz.gen == RADAMSA)
+            cases = generator_radamsa(CASE_COUNT, fuzz.in_dir, fuzz.tmp_dir, prefix);
         if(send_cases(cases) < 0){
             goto cleanup;
         }
@@ -394,7 +408,7 @@ int check_stop(void * cases, int result){
     usleep(500000);
 
     // If process id is supplied, check it exists and set stop if it doesn't
-    check_pid = runpro();
+    check_pid = runpro(server_command);
     if(check_pid<=0){
         printf("server is not running *****************************\n");
         return -1;
@@ -415,6 +429,39 @@ int pid_exists(int pid){
     }
 
     // PID found
+    return 0;
+}
+
+int runpro(char *command1)
+{
+    int res;
+    pid_t pid;
+    FILE* pipe = 0;
+    int s;
+
+    //char *argv[] = {"./bug", ">", "log.txt", "2>&1", 0};
+    //char *argv[] = {"./bug", 0};
+    char command[] = "{ /home/fuzz/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1";
+    res = get_percent_used();
+    if(res!=0){
+        kill(res, SIGKILL);
+    }
+
+    if((pid = fork()) == 0){
+        pipe = popen(command, "r");
+        pclose(pipe);
+        exit(0);
+    }
+    else if(pid < 0){
+        printf("[!] generator_radamsa fork() failed:");
+        return 0;
+    }
+    else{
+        usleep(50000);
+        res = get_percent_used();
+        return res;
+        //waitpid(pid, &s, 0x00);
+    }
     return 0;
 }
 

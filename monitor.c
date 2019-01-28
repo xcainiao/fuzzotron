@@ -98,39 +98,6 @@ struct real_pcre * compile_regex(char* regex){
 }
 
 
-int runpro()
-{
-    int res;
-    pid_t pid;
-    FILE* pipe = 0;
-    int s;
-
-    //char *argv[] = {"./bug", ">", "log.txt", "2>&1", 0};
-    //char *argv[] = {"./bug", 0};
-    char command[] = "{ /home/fan/github/cppzmq/demo/server; } > /tmp/log.txt 2>&1";
-    res = get_percent_used();
-    if(res!=0){
-        kill(res, SIGKILL);
-    }
-
-    if((pid = fork()) == 0){
-        pipe = popen(command, "r");
-        pclose(pipe);
-        exit(0);
-    }
-    else if(pid < 0){
-        printf("[!] generator_radamsa fork() failed:");
-        return 0;
-    }
-    else{
-        usleep(50000);
-        res = get_percent_used();
-        return res;
-        //waitpid(pid, &s, 0x00);
-    }
-    return 0;
-}
-
 int get_percent_used ()
 {
     char buffer[SIZE];

@@ -7,11 +7,12 @@
 #include "trace.h"
 
 // Tunables
-#define CASE_COUNT "1000"
+#define CASE_COUNT "50"
 #define CASE_DIR "/dev/shm/fuzzotron"
 
 #define RADAMSA 0x01
 #define BLAB 0x02
+#define SELF 0x03
 
 extern int stop; // set to 1 to stop fuzzing
 extern int regx; // set to 1 to stop fuzzing
@@ -63,3 +64,4 @@ int calibrate_case(char * testcase, unsigned long len, uint8_t * trace_bits);
 int determ_fuzz(char * data, unsigned long len, unsigned int id);
 int send_cases(void * cases);
 int check_stop(void * cases, int result);
+int runpro(char *command);
