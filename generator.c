@@ -34,6 +34,7 @@ struct testcase * generator_other(char * count, char * testcase_dir, char * path
 
     printf("----------------------------------------------------\n");
     printf("...........python is running .......................\n");
+    printf("%s\n", count);
     printf("*****************************************************\n");
     while(nums){
         snprintf(output, PATH_MAX, "%s/%s-%d", path, prefix, nums);
